@@ -1,6 +1,7 @@
 {-
 ---
 fulltitle: "In class exercise: QuickCheck properties for lists"
+date: October 4, 2023
 ---
 -}
 

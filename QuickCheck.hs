@@ -495,7 +495,7 @@ the output *is* ordered if the input was ordered to begin with
 
 prop_insert_ordered :: Int -> [Int] -> Property
 prop_insert_ordered x xs =
-  isOrdered xs ==> isOrdered (insert x xs)
+  isOrdered xs ==> isOrdered (insert x xs) 
 
 {-
 Notice that now, the precondition is more *complex* -- the property
@@ -518,6 +518,8 @@ variant
 prop_insert_ordered_vacuous :: Int -> [Int] -> Bool
 prop_insert_ordered_vacuous x xs =
   not (isOrdered xs) || isOrdered (insert x xs)
+
+-- not A || B     iff    A -> B
 
 {-
 QC will happily check it for us
@@ -805,14 +807,40 @@ genBool = undefined
 -- >>> QC.sample' genBool
 
 genTriple :: Gen a -> Gen b -> Gen c -> Gen (a, b, c)
-genTriple = undefined
+genTriple = liftM3 (\x y z -> (x,y,z))
+
+-- genTriple' :: Gen a -> Gen b -> Gen c -> Gen (a, b, c)
+genTriple' ga gb gc = 
+  ga >>= \a -> 
+   gb >>= \b ->
+    gc >>= \c -> return (a,b,c)
+
+genTriple'' ga gb gc = do
+  a <- ga
+  b <- gb
+  c <- gc
+  return (a,b,c)
+
 
 -- >>> QC.sample' (genTriple genBool genThree genFive)
 
 genMaybe :: Gen a -> Gen (Maybe a)
-genMaybe ga = undefined
+genMaybe ga = (arbitrary :: Gen Bool) >>= 
+   \b -> if b then fmap Just ga  else return Nothing
 
--- >>> QC.sample' (genMaybe genThree)
+genMaybe' ga = (arbitrary :: Gen Bool) >>= 
+   \b -> if b then ga >>= \a -> return (Just a)  else return Nothing
+
+genMaybe'' ga = fmap Just ga
+
+genMaybe''' ga = QC.frequency [(1, return Nothing), (7, Just <$> ga)]
+
+-- >>> QC.sample' (genMaybe''' (arbitrary :: Gen Int))
+-- [Just 0,Just 0,Just 3,Just 6,Just 0,Just 2,Nothing,Just 7,Just 6,Just (-16),Just 7]
+
+-- >>> QC.sample' (genMaybe genThreeOrFive)
+-- [Nothing,Just 3,Just 3,Nothing,Just 5,Nothing,Nothing,Just 5,Just 3,Just 3,Just 5]
+
 
 {-
 The Arbitrary Typeclass
@@ -967,10 +995,10 @@ Now look at that distribution! Not too small, not too big, not too many empty tr
 -}
 
 -- >>> map length <$> QC.sample' (genTree :: Gen (Tree Int))
--- [0,3,1,4,4,8,8,9,19,8,11]
+-- [0,3,5,4,4,0,0,11,20,16,9]
 
 {-
-I encourage you to look at the implementation of `genTree4` closely. This use
+I encourage you to look at the implementation of `genTree` closely. This use
 of `frequency` and `sized` is particularly important to controlling the
 generation of arbitrary tree-structured data.
 
