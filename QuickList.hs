@@ -4,6 +4,8 @@ fulltitle: "In class exercise: QuickCheck properties for lists"
 date: October 4, 2023
 ---
 -}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Avoid restricted function" #-}
 
 module QuickList where
 
@@ -176,15 +178,17 @@ implementation of `minimum` that doesn't satisfy your property.
 (Don't forget to fill in the type signature for `prop_minimum`!)
 -}
 
-prop_minimum :: Ord a => ([a] -> a) -> Undefined
-prop_minimum minimum' = undefined
+prop_minimum :: Ord a => ([a] -> a) -> [a] -> Bool
+prop_minimum minimum' [] = True
+prop_minimum minimum' l = minimum' l == minimum l
 
 {-
 Also define a buggy implementation that can be identified by your property.
 -}
 
 minimumBug :: Ord a => [a] -> a
-minimumBug = undefined
+minimumBug [] = error "can't get min of empty list"
+minimumBug (x : xs) = x
 
 {-
 Be careful when testing your code with ghci. Make sure that you provide
@@ -283,18 +287,28 @@ Then implement your definition so that you get the following behavior:
 -}
 
 instance Arbitrary SmallNonNegInt where
-  arbitrary = undefined
-  shrink = undefined
+  arbitrary :: Gen SmallNonNegInt
+  arbitrary = fmap SmallNonNegInt (chooseInt (0, 1000))
+
+  shrink :: SmallNonNegInt -> [SmallNonNegInt]
+  shrink (SmallNonNegInt x) = (shrinkHelper :: Int -> Int -> [SmallNonNegInt]) x 5 
+    where
+      shrinkHelper x' 0 = []
+      shrinkHelper x' n = if x' == 0 then [] else SmallNonNegInt (x' - 1) : shrinkHelper (x' - 1) (n - 1)
 
 {-
 Now, use this type to define your property specifying `replicate`.
 -}
 
-prop_replicate :: (Int -> a -> [a]) -> Undefined
-prop_replicate replicate' = undefined
+prop_replicate :: Eq a => (Int -> a -> [a]) -> Int -> a -> Bool
+prop_replicate replicate' k x =
+  let l1 = replicate' k x
+      l2 = replicate k x
+  in length l1 == length l2 && foldr (\x' acc -> x' == x && acc) True l1
+  
 
 replicateBug :: Int -> a -> [a]
-replicateBug = undefined
+replicateBug k x = [x]
 
 {-
 -- Part c
@@ -307,14 +321,24 @@ in the result is non-empty and contains only equal elements".  Also
 write a buggy version of `group` that violates both of them.
 -}
 
-prop_group_1 :: Eq a => ([a] -> [[a]]) -> Undefined
-prop_group_1 group' = undefined
+prop_group_1 :: Eq a => ([a] -> [[a]]) -> [a] -> Bool
+prop_group_1 group' l =
+  let result = group' l in
+    let concatResult = foldr (\x acc -> x ++ acc) [] result in
+      l == concatResult
 
-prop_group_2 :: Eq a => ([a] -> [[a]]) -> Undefined
-prop_group_2 group' = undefined
+prop_group_2 :: Eq a => ([a] -> [[a]]) -> [a] -> Bool
+prop_group_2 group' l =
+  let result = group' l in
+    foldr f True result
+    where
+      f x acc = not (null x) && same x && acc
+      same (x': y':xs') = x' == y' && same (y' : xs')
+      same _ = True
+
 
 groupBug :: Eq a => [a] -> [[a]]
-groupBug = undefined
+groupBug l = [l]
 
 {-
 -- Part d
@@ -324,17 +348,17 @@ Write two interesting properties about
 Write two different buggy versions, one which violates each property.
 -}
 
-prop_reverse_1 :: ([a] -> [a]) -> Undefined
-prop_reverse_1 reverse' = undefined
+prop_reverse_1 :: Eq a => ([a] -> [a]) -> [a] -> Bool
+prop_reverse_1 reverse' l = reverse' (reverse' l) == l
 
-prop_reverse_2 :: ([a] -> [a]) -> Undefined
-prop_reverse_2 reverse' = undefined
+prop_reverse_2 :: Eq a => ([a] -> [a]) -> [a] -> Bool
+prop_reverse_2 reverse' l = reverse' l == reverse l
 
 reverseBug_1 :: [a] -> [a]
-reverseBug_1 = undefined
+reverseBug_1 l = l
 
 reverseBug_2 :: [a] -> [a]
-reverseBug_2 = undefined
+reverseBug_2 l = []
 
 {-
 Once you've written all of these, evaluating `main` in GHCi should
